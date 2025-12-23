@@ -1,0 +1,1 @@
+print("In decimal {0:b} ".format(10101215))

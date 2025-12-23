@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Registration</title>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="index.html">Home</a> |
+      <a href="login.html">Login</a> |
+      <a href="register.html">Registration</a> |
+      <a href="cse.html">Catalogue</a> |
+      <a href="cart.html">Cart</a>
+    </nav>
+  </header>
+
+  <main>
+    <form>
+      <label>Name: <input type="text" name="name" required></label><br>
+      <label>Email: <input type="email" name="email" required></label><br>
+      <label>Password: <input type="password" name="password" required></label><br>
+      <label>Phone Number: <input type="tel" name="phone" required></label><br>
+
+      Gender:<br>
+      <label><input type="radio" name="gender" value="male"> Male</label>
+      <label><input type="radio" name="gender" value="female"> Female</label><br>
+
+      Date of Birth:<br>
+      <select name="day">
+        <option>DD</option>
+        <!-- Add options -->
+      </select>
+      <select name="month">
+        <option>MM</option>
+        <!-- Add options -->
+      </select>
+      <select name="year">
+        <option>YY</option>
+        <!-- Add options -->
+      </select><br>
+
+      Languages Known:<br>
+      <label><input type="checkbox" name="lang" value="English"> English</label>
+      <label><input type="checkbox" name="lang" value="Telugu"> Telugu</label>
+      <label><input type="checkbox" name="lang" value="Hindi"> Hindi</label>
+      <label><input type="checkbox" name="lang" value="Tamil"> Tamil</label><br>
+
+      Address:<br>
+      <textarea name="address" rows="4" cols="40"></textarea><br>
+
+      <button type="submit">Submit</button>
+    </form>
+  </main>
+</body>
+</html>

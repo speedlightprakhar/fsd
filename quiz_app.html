@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quiz App - Demo</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    /* Simple, clean styles */
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#7c3aed;
+      --muted:#9aa4b2;
+      --surface:#0f1724;
+      --glass: rgba(255,255,255,0.03);
+      --success: #10b981;
+      --danger: #ef4444;
+      --shadow: 0 6px 18px rgba(2,6,23,0.6);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background: linear-gradient(180deg, #071024 0%, #08132b 100%);
+      color:#e6eef8;
+      min-height:100vh;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:32px;
+    }
+    .app {
+      width:100%;
+      max-width:1100px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border-radius:14px;
+      box-shadow: var(--shadow);
+      padding:20px;
+      display:grid;
+      grid-template-columns: 280px 1fr;
+      gap:20px;
+    }
+    /* Sidebar */
+    .sidebar{
+      background:var(--card);
+      border-radius:10px;
+      padding:16px;
+      min-height:420px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .brand{
+      display:flex;align-items:center;gap:10px;margin-bottom:8px;
+    }
+    .logo{
+      width:44px;height:44px;border-radius:8px;
+      background:linear-gradient(135deg,var(--accent),#2dd4bf);
+      display:flex;align-items:center;justify-content:center;font-weight:700;
+    }
+    .nav button{
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.03);
+      color:var(--muted);
+      text-align:left;
+      cursor:pointer;
+    }
+    .nav button.active{ background:linear-gradient(90deg, rgba(124,58,237,0.15), rgba(45,212,191,0.05)); color:#fff; border-color: rgba(124,58,237,0.35); }
+    .content {
+      min-height:420px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      padding:14px;
+      border-radius:10px;
+      border: 1px solid rgba(255,255,255,0.02);
+      box-shadow: 0 4px 14px rgba(2,6,23,0.45);
+    }
+    h2{ margin:0 0 8px 0; font-size:18px; color:#fff }
+    p.small{ margin:0; color:var(--muted); font-size:13px }
+    .row { display:flex; gap:12px; align-items:center; }
+    .col { display:flex; flex-direction:column; gap:8px; }
+    input[type="text"], input[type="email"], input[type="password"], textarea, select {
+      width:100%;
+      padding:10px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.02);
+      color: #e6eef8;
+      outline:none;
+    }
+    button.primary{
+      background: linear-gradient(90deg,var(--accent), #06b6d4);
+      border:none;color:#fff;padding:10px 12px;border-radius:8px;cursor:pointer;
+    }
+    button.ghost{
+      background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer;
+    }
+    .muted{ color:var(--muted); font-size:13px }
+    /* list of quizzes */
+    .quiz-list{ display:flex; flex-direction:column; gap:8px; }
+    .quiz-item{ display:flex; justify-content:space-between; align-items:center;padding:10px;border-radius:8px;background:var(--glass); border:1px solid rgba(255,255,255,0.02); }
+    .badge { background:rgba(255,255,255,0.03); padding:6px 10px;border-radius:999px; font-size:13px; color:var(--muted); }
+    .attempt-row{ display:flex; justify-content:space-between; gap:12px; padding:8px; border-radius:8px; background:rgba(255,255,255,0.01); }
+    .small-muted{ font-size:12px; color:var(--muted) }
+    /* responsive */
+    @media (max-width:980px){
+      .app { grid-template-columns: 1fr; padding:12px }
+      .sidebar { order:2 }
+      .content { order:1 }
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar card">
+    <div class="brand">
+      <div class="logo">Q</div>
+      <div>
+        <div style="font-weight:700">QuizApp Demo</div>
+        <div class="small-muted">Simple prototype</div>
+      </div>
+    </div>
+    <div id="auth-area">
+      <!-- login/register forms inserted here -->
+    </div>
+    <div class="nav" id="nav">
+      <button data-view="dashboard" class="active">Dashboard</button>
+      <button data-view="create">Create Quiz</button>
+      <button data-view="upload">Upload CSV</button>
+      <button data-view="quizzes">Browse Quizzes</button>
+      <button data-view="attempts">My Attempts</button>
+      <button data-view="about">About / Export</button>
+    </div>
+    <div style="margin-top:auto">
+      <div class="muted" id="signedAs">Not signed in</div>
+      <div style="height:10px"></div>
+      <button id="signoutBtn" class="ghost" style="width:100%">Sign out</button>
+    </div>
+  </div>
+  <!-- MAIN CONTENT -->
+  <div class="content">
+    <!-- Dashboard -->
+    <div id="view-dashboard" class="card view">
+      <h2>Dashboard</h2>
+      <div class="row">
+        <div style="flex:1">
+          <div class="card" style="padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div class="muted">Quizzes Attempted</div>
+                <div style="font-weight:700;font-size:22px" id="stat-attempts">0</div>
+              </div>
+              <div>
+                <div class="muted">Total Marks</div>
+                <div style="font-weight:700;font-size:22px" id="stat-marks">0</div>
+              </div>
+              <div>
+                <div class="muted">Average (%)</div>
+                <div style="font-weight:700;font-size:22px" id="stat-avg">0%</div>
+              </div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+          <div class="card">
+            <h3 style="margin:0 0 8px 0">Performance (last attempts)</h3>
+            <canvas id="marksChart" height="120"></canvas>
+          </div>
+        </div>
+        <div style="width:320px">
+          <div class="card">
+            <h3 style="margin:0 0 8px 0">Quick Actions</h3>
+            <button class="primary" id="quick-create">Create new quiz</button>
+            <div style="height:8px"></div>
+            <label style="font-size:13px" class="small-muted">Upload sample CSV</label>
+            <input type="file" id="sampleCsv" accept=".csv" />
+            <div style="height:8px"></div>
+            <button class="ghost" id="exportData">Export Data (JSON)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Create quiz -->
+    <div id="view-create" class="card view" style="display:none">
+      <h2>Create Quiz</h2>
+      <div class="col">
+        <input type="text" id="createTitle" placeholder="Quiz title" />
+        <textarea id="createDesc" rows="2" placeholder="Short description (optional)"></textarea>
+        <div class="card" style="padding:10px">
+          <h3 style="margin:0 0 8px 0">Add Question</h3>
+          <select id="qType">
+            <option value="mcq">Multiple choice (MCQ)</option>
+            <option value="short">Short answer</option>
+          </select>
+          <input type="text" id="qText" placeholder="Question text" />
+          <div id="mcqOptions">
+            <input type="text" class="opt" placeholder="Option 1" />
+            <input type="text" class="opt" placeholder="Option 2" />
+            <input type="text" class="opt" placeholder="Option 3 (optional)" />
+            <input type="text" class="opt" placeholder="Option 4 (optional)" />
+            <select id="correctIndex">
+              <option value="0">Correct option: 1</option>
+              <option value="1">Correct option: 2</option>
+              <option value="2">Correct option: 3</option>
+              <option value="3">Correct option: 4</option>
+            </select>
+          </div>
+          <input type="text" id="shortAnswer" placeholder="Correct answer (used for exact match)" style="display:none" />
+          <input type="number" id="qMarks" placeholder="Marks (default 1)" min="0" value="1" />
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="addQuestionBtn" class="primary">Add question</button>
+            <button id="clearQuestions" class="ghost">Clear list</button>
+          </div>
+        </div>
+        <div class="card" id="questionsList" style="max-height:220px; overflow:auto">
+          <h3 style="margin:0 0 8px 0">Questions (0)</h3>
+          <div id="questionsContainer"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="saveQuizBtn" class="primary">Save Quiz</button>
+        </div>
+      </div>
+    </div>
+    <!-- Upload CSV -->
+    <div id="view-upload" class="card view" style="display:none">
+      <h2>Upload CSV</h2>
+      <p class="small">CSV template columns: <code>type,question,option1,option2,option3,option4,correct,marks</code></p>
+      <p class="small">type: mcq | short</p>
+      <input type="file" id="csvUpload" accept=".csv" />
+      <div style="height:12px"></div>
+      <div class="card">
+        <h3>Parsed Preview</h3>
+        <div id="csvPreview" class="muted">No file chosen.</div>
+        <div style="height:8px"></div>
+        <button id="importCsvBtn" class="primary">Import as Quiz</button>
+      </div>
+    </div>
+    <!-- Browse quizzes -->
+    <div id="view-quizzes" class="card view" style="display:none">
+      <h2>Available Quizzes</h2>
+      <div class="quiz-list" id="quizListContainer"></div>
+    </div>
+    <!-- Attempts -->
+    <div id="view-attempts" class="card view" style="display:none">
+      <h2>My Attempts</h2>
+      <div id="attemptsList"></div>
+    </div>
+    <!-- About / Export -->
+    <div id="view-about" class="card view" style="display:none">
+      <h2>About & Export</h2>
+      <p class="small">This demo stores data locally in your browser's <code>localStorage</code>. Use Export to save data as JSON, or Reset to clear demo data.</p>
+      <div style="display:flex;gap:8px">
+        <button id="downloadJson" class="primary">Download JSON</button>
+        <button id="resetData" class="ghost">Reset Demo Data</button>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <h3>CSV Template</h3>
+        <pre style="font-size:13px;margin:0;padding:8px;background:rgba(255,255,255,0.02);border-radius:6px">
+type,question,option1,option2,option3,option4,correct,marks
+mcq,What is 2+2?,1,2,3,4,4,1
+short,Name the capital of France,,,,,Paris,1
+        </pre>
+      </div>
+    </div>
+    <!-- Dynamic quiz play modal area -->
+    <div id="quizPlayModal" class="card view" style="display:none">
+      <!-- populated dynamically when user plays a quiz -->
+    </div>
+  </div>
+</div>
+<script>
+/*
+  Simple client-side Quiz App demo
+  - Stores data in localStorage
+  - Users: stored as objects {id, name, email, password} [password stored plaintext for demo only; never do this in production]
+  - Quizzes: {id, title, desc, ownerId, questions: [{qid, type, text, options, correctAnswer, marks}]}
+  - Attempts: {id, quizId, userId, answers: [{qid, answer, obtainedMarks}], totalObtained, totalPossible, when}
+*/
+(function(){
+  // ---------- Utilities ----------
+  const uid = (prefix='id') => prefix + '_' + Math.random().toString(36).slice(2,9);
+  const $ = (sel, ctx=document) => ctx.querySelector(sel);
+  const $$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
+  const nowISO = () => new Date().toISOString();
+  // ---------- localStorage helpers ----------
+  const STORE_KEYS = { USERS: 'qa_users', QUIZZES:'qa_quizzes', ATTEMPTS:'qa_attempts', CUR:'qa_currentUser' };
+  function read(key){ try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e){ return null; } }
+  function write(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+  function ensureStore(){
+    if(!read(STORE_KEYS.USERS)) write(STORE_KEYS.USERS, []);
+    if(!read(STORE_KEYS.QUIZZES)) write(STORE_KEYS.QUIZZES, []);
+    if(!read(STORE_KEYS.ATTEMPTS)) write(STORE_KEYS.ATTEMPTS, []);
+  }
+  // init demo user if empty
+  function maybeInitDemo(){
+    ensureStore();
+    let users = read(STORE_KEYS.USERS);
+    if(users.length === 0){
+      const demo = { id: uid('u'), name: 'Demo User', email:'demo@example.com', password:'demo' };
+      users.push(demo);
+      write(STORE_KEYS.USERS, users);
+    }
+  }
+  ensureStore();
+  maybeInitDemo();
+  // ---------- app state ----------
+  let state = {
+    currentView: 'dashboard',
+    currentUser: read(STORE_KEYS.CUR),
+    quizInMemoryQuestions: []
+  };
+  // ---------- DOM refs ----------
+  const navButtons = Array.from(document.querySelectorAll('#nav button'));
+  const views = Array.from(document.querySelectorAll('.view'));
+  const authArea = $('#auth-area');
+  const signedAs = $('#signedAs');
+  const signoutBtn = $('#signoutBtn');
+  // ---------- Navigation ----------
+  function showView(name){
+    state.currentView = name;
+    views.forEach(v => v.style.display = v.id === 'view-'+name ? '' : 'none');
+    navButtons.forEach(b => b.classList.toggle('active', b.dataset.view === name));
+    renderView(name);
+  }
+  navButtons.forEach(b => b.addEventListener('click', ()=> showView(b.dataset.view)));
+  // ---------- Auth UI ----------
+  function renderAuthArea(){
+    const cur = state.currentUser;
+    if(cur){
+      authArea.innerHTML = `
+        <div style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.01)">
+          <div style="font-weight:700">${escapeHtml(cur.name)}</div>
+          <div class="small-muted">${escapeHtml(cur.email)}</div>
+        </div>
+      `;
+      signedAs.textContent = 'Signed as: ' + cur.name;
+signoutBtn.style.display = '';
+    } else {
+      authArea.innerHTML = `
+        <div class="card" style="padding:10px">
+          <h3 style="margin:0 0 8px 0">Sign in / Register</h3>
+          <input id="authEmail" type="email" placeholder="Email" />
+          <input id="authName" style="display:none" placeholder="Full name (register)" />
+          <input id="authPassword" type="password" placeholder="Password" />
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="loginBtn" class="primary">Login</button>
+            <button id="showRegister" class="ghost">Register</button>
+          </div>
+          <div style="height:8px"></div>
+          <div class="small-muted">Demo: demo@example.com / demo</div>
+        </div>
+      `;
+      signedAs.textContent = 'Not signed in';
+signoutBtn.style.display = 'none';
+      $('#showRegister').addEventListener('click', ()=> {
+        $('#authName').style.display = '';
+        $('#showRegister').style.display = 'none';
+        $('#loginBtn').textContent = 'Register';
+        $('#loginBtn').id = 'registerBtn';
+        $('#registerBtn').addEventListener('click', handleRegister);
+      });
+      $('#loginBtn')?.addEventListener('click', handleLogin);
+    }
+  }
+  function handleLogin(){
+    const email = $('#authEmail').value.trim().toLowerCase();
+    const password = $('#authPassword').value;
+    const users = read(STORE_KEYS.USERS) || [];
+    const found = users.find(u => u.email === email && u.password === password);
+    if(!found){ alert('Invalid credentials. For demo try demo@example.com / demo'); return; }
+    state.currentUser = found;
+    write(STORE_KEYS.CUR, found);
+    renderAuthArea();
+    showView('dashboard');
+    refreshAll();
+  }
+  function handleRegister(){
+    const email = $('#authEmail').value.trim().toLowerCase();
+    const password = $('#authPassword').value;
+    const name = $('#authName').value.trim() || 'New User';
+    if(!email || !password){ alert('Enter email and password'); return; }
+    const users = read(STORE_KEYS.USERS) || [];
+    if(users.some(u=>u.email===email)){ alert('Email already registered'); return; }
+    const newUser = { id: uid('u'), name, email, password };
+    users.push(newUser);
+    write(STORE_KEYS.USERS, users);
+    state.currentUser = newUser;
+    write(STORE_KEYS.CUR, newUser);
+    renderAuthArea();
+    showView('dashboard');
+    refreshAll();
+  }
+  signoutBtn.addEventListener('click', ()=>{
+    state.currentUser = null;
+    localStorage.removeItem(STORE_KEYS.CUR);
+    renderAuthArea();
+    refreshAll();
+  });
+  // ---------- Startup ----------
+  renderAuthArea();
+  // ---------- Create Quiz UI logic ----------
+  const qTypeEl = $('#qType');
+  const mcqOptionsWrap = $('#mcqOptions');
+  const shortAnswerEl = $('#shortAnswer');
+  qTypeEl.addEventListener('change', () => {
+    if(qTypeEl.value === 'mcq'){ mcqOptionsWrap.style.display=''; shortAnswerEl.style.display='none'; }
+    else { mcqOptionsWrap.style.display='none'; shortAnswerEl.style.display=''; }
+  });
+  const questions = []; // in-memory before save
+  function addQuestion(){
+    const type = qTypeEl.value;
+    const text = $('#qText').value.trim();
+    const marks = Number($('#qMarks').value) || 1;
+    if(!text){ alert('Question text required'); return; }
+    const qid = uid('q');
+    if(type === 'mcq'){
+      const opts = $$('.opt').map(i=>i.value.trim()).filter(Boolean);
+      const correctIdx = Number($('#correctIndex').value);
+      const correct = opts[correctIdx] ?? opts[0] ?? '';
+      questions.push({ qid, type, text, options: opts, correctAnswer: correct, marks });
+    } else {
+      const correct = $('#shortAnswer').value.trim();
+      questions.push({ qid, type, text, options: [], correctAnswer: correct, marks });
+    }
+    renderQuestions();
+    $('#qText').value = ''; $$('.opt').forEach(i=>i.value=''); $('#shortAnswer').value=''; $('#qMarks').value=1;
+  }
+  $('#addQuestionBtn').addEventListener('click', addQuestion);
+  $('#clearQuestions').addEventListener('click', ()=>{
+    if(!confirm('Clear all questions?')) return;
+    questions.length = 0; renderQuestions();
+  });
+  function renderQuestions(){
+    const container = $('#questionsContainer');
+    container.innerHTML = '';
+    $('#questionsList h3').textContent = `Questions (${questions.length})`;
+    questions.forEach((q, idx)=>{
+      const d = document.createElement('div');
+      d.className = 'attempt-row';
+      d.innerHTML = `<div style="flex:1">
+        <div style="font-weight:700">${idx+1}. ${escapeHtml(q.text)}</div>
+        <div class="small-muted">${q.type.toUpperCase()} • ${q.marks} marks</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="ghost" data-i="${idx}">Remove</button>
+        </div>`;
+      container.appendChild(d);
+      d.querySelector('button').addEventListener('click', (e)=>{
+        const i = Number(e.target.dataset.i);
+        questions.splice(i,1); renderQuestions();
+      });
+    });
+  }
+  // Save quiz
+  $('#saveQuizBtn').addEventListener('click', ()=>{
+    if(!state.currentUser){ alert('Please log in to save a quiz'); return; }
+    const title = $('#createTitle').value.trim();
+    if(!title) { alert('Title required'); return; }
+    if(questions.length === 0){ alert('Add at least one question'); return; }
+    const quizzes = read(STORE_KEYS.QUIZZES) || [];
+    const quiz = {
+      id: uid('quiz'),
+      title,
+      description: $('#createDesc').value.trim(),
+      ownerId: state.currentUser.id,
+      questions: questions.map(q=>({ ...q }))
+    };
+    quizzes.push(quiz);
+    write(STORE_KEYS.QUIZZES, quizzes);
+    // clear
+    $('#createTitle').value=''; $('#createDesc').value=''; questions.length=0; renderQuestions();
+    alert('Quiz saved!');
+    refreshAll();
+    showView('quizzes');
+  });
+  // ---------- CSV Upload ----------
+  let csvParsed = null;
+  $('#csvUpload').addEventListener('change', (ev)=>{
+    const f = ev.target.files[0];
+    if(!f) return;
+    Papa.parse(f, {
+      header:true, skipEmptyLines:true,
+      complete: (res) => {
+        csvParsed = res.data.map((row, idx)=>({
+          type: (row.type||'').trim().toLowerCase(),
+          question: row.question||row.text||'',
+          option1: row.option1||'',
+          option2: row.option2||'',
+          option3: row.option3||'',
+          option4: row.option4||'',
+          correct: row.correct||'',
+          marks: Number(row.marks)||1
+        }));
+        $('#csvPreview').textContent = JSON.stringify(csvParsed, null, 2);
+      }
+    });
+  });
+  $('#importCsvBtn').addEventListener('click', ()=>{
+    if(!csvParsed || !state.currentUser){ alert('No CSV parsed or not signed in'); return; }
+    // ask title
+    const title = prompt('Title for imported quiz?','Imported Quiz');
+    if(!title) return;
+    const quiz = {
+      id: uid('quiz'),
+      title,
+      description: 'Imported from CSV',
+      ownerId: state.currentUser.id,
+      questions: csvParsed.map(r => {
+        if(r.type === 'mcq'){
+          const opts = [r.option1, r.option2, r.option3, r.option4].filter(Boolean);
+          return { qid: uid('q'), type:'mcq', text:r.question, options:opts, correctAnswer: r.correct, marks: r.marks || 1 };
+        } else {
+          return { qid: uid('q'), type:'short', text:r.question, options:[], correctAnswer: r.correct, marks: r.marks || 1 };
+        }
+      })
+    };
+    const quizzes = read(STORE_KEYS.QUIZZES) || [];
+    quizzes.push(quiz);
+    write(STORE_KEYS.QUIZZES, quizzes);
+    alert('Imported quiz saved.');
+    csvParsed = null; $('#csvUpload').value='';
+    $('#csvPreview').textContent = 'No file chosen.';
+    refreshAll();
+    showView('quizzes');
+  });
+  // Quick sample CSV upload to import
+  $('#sampleCsv').addEventListener('change', (ev)=>{
+    const f = ev.target.files[0];
+    if(!f) return;
+    Papa.parse(f, { header:true, skipEmptyLines:true, complete(res){
+      // reuse csvParsed
+      csvParsed = res.data.map((row)=>({
+        type: (row.type||'').trim().toLowerCase(),
+        question: row.question||row.text||'',
+        option1: row.option1||'',
+        option2: row.option2||'',
+        option3: row.option3||'',
+        option4: row.option4||'',
+        correct: row.correct||'',
+        marks: Number(row.marks)||1
+      }));
+      $('#csvPreview').textContent = JSON.stringify(csvParsed, null, 2);
+      showView('upload');
+    }});
+  });
+  // ---------- Browsing quizzes ----------
+  function renderQuizList(){
+    const container = $('#quizListContainer');
+    container.innerHTML = '';
+    const quizzes = read(STORE_KEYS.QUIZZES) || [];
+    if(quizzes.length === 0){
+      container.innerHTML = '<div class="muted">No quizzes created yet.</div>'; return;
+    }
+    quizzes.forEach(q => {
+      const owner = (read(STORE_KEYS.USERS) || []).find(u=>u.id===q.ownerId);
+      const el = document.createElement('div');
+      el.className = 'quiz-item';
+      el.innerHTML = `<div>
+          <div style="font-weight:700">${escapeHtml(q.title)}</div>
+          <div class="small-muted">${escapeHtml(q.description||'')} • ${q.questions.length} Qs • by ${owner?escapeHtml(owner.name):'Unknown'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="ghost" data-id="${q.id}">View</button>
+          <button class="primary" data-play="${q.id}">Play</button>
+        </div>`;
+      container.appendChild(el);
+      el.querySelector('[data-play]')?.addEventListener('click', (e)=> startQuiz(e.target.dataset.play));
+      el.querySelector('[data-id]')?.addEventListener('click', (e)=> {
+        const id = e.target.dataset.id;
+        alert('Quiz details:\\n' + JSON.stringify(quizzes.find(x=>x.id===id), null, 2));
+      });
+    });
+  }
+  // ---------- Quiz play & evaluation ----------
+  function startQuiz(quizId){
+    const quizzes = read(STORE_KEYS.QUIZZES) || [];
+    const quiz = quizzes.find(q=>q.id===quizId);
+    if(!quiz) return alert('Quiz not found');
+    // build modal UI
+    const modal = $('#quizPlayModal');
+modal.style.display = '';
+    modal.innerHTML = '';
+    const container = document.createElement('div');
+    container.innerHTML = `<h2>${escapeHtml(quiz.title)}</h2>
+      <div class="small-muted">${escapeHtml(quiz.description||'')}</div>
+      <div id="quizQuestions"></div>
+      <div style="height:8px"></div>
+      <div style="display:flex;gap:8px">
+        <button id="submitQuiz" class="primary">Submit</button>
+        <button id="cancelQuiz" class="ghost">Cancel</button>
+      </div>`;
+    modal.appendChild(container);
+    const questionsWrap = $('#quizQuestions', modal);
+    // render questions
+    quiz.questions.forEach((q, idx) => {
+      const d = document.createElement('div');
+      d.className = 'card';
+d.style.marginTop = '10px';
+      d.innerHTML = `<div style="font-weight:700">${idx+1}. ${escapeHtml(q.text)}</div>
+        <div class="small-muted">${q.marks} marks</div>
+        <div class="q-answers"></div>`;
+      questionsWrap.appendChild(d);
+      const ans = d.querySelector('.q-answers');
+      if(q.type === 'mcq'){
+        q.options.forEach((opt, i)=>{
+          const id = uid('choice');
+          const radio = document.createElement('div');
+          radio.innerHTML = `<label style="display:flex;gap:8px;align-items:center">
+            <input type="radio" name="${q.qid}" value="${escapeHtml(opt)}" /> <span>${escapeHtml(opt)}</span>
+          </label>`;
+          ans.appendChild(radio);
+        });
+      } else {
+        const ta = document.createElement('div');
+        ta.innerHTML = `<input type="text" name="${q.qid}" placeholder="Your answer" />`;
+        ans.appendChild(ta);
+      }
+    });
+    $('#cancelQuiz').addEventListener('click', ()=> { modal.style.display='none'; modal.innerHTML=''; });
+    $('#submitQuiz').addEventListener('click', ()=>{
+      const answers = [];
+      let totalObtained = 0;
+      let totalPossible = 0;
+      quiz.questions.forEach(q=>{
+        totalPossible += q.marks || 1;
+        let submitted;
+        if(q.type === 'mcq'){
+          const node = document.querySelector(`input[name="${q.qid}"]:checked`);
+          submitted = node ? node.value : null;
+        } else {
+          const node = document.querySelector(`input[name="${q.qid}"]`);
+          submitted = node ? node.value.trim() : '';
+        }
+        let obtained = 0;
+        // evaluation logic: exact match (case-insensitive) for short answers; MCQ exact match to stored correctAnswer
+        if(q.type === 'mcq'){
+          if(submitted !== null && String(submitted) === String(q.correctAnswer)) obtained = q.marks || 1;
+        } else {
+          if(String(submitted || '').trim().toLowerCase() === String(q.correctAnswer || '').trim().toLowerCase()) obtained = q.marks || 1;
+        }
+        answers.push({ qid: q.qid, answer: submitted, obtainedMarks: obtained, marks: q.marks || 1 });
+        totalObtained += obtained;
+      });
+      // record attempt
+      const attempts = read(STORE_KEYS.ATTEMPTS) || [];
+      const attempt = { id: uid('a'), quizId: quiz.id, userId: state.currentUser ? state.currentUser.id : null, answers, totalObtained, totalPossible, when: nowISO() };
+      attempts.push(attempt);
+      write(STORE_KEYS.ATTEMPTS, attempts);
+      // update user stats? this demo computes stats on the fly
+      modal.innerHTML = '';
+modal.style.display = '';
+      // show results with per-question feedback
+      const results = document.createElement('div');
+      results.innerHTML = `<h2>Result: ${totalObtained} / ${totalPossible}</h2>
+        <div class="small-muted">Submitted: ${new Date(attempt.when).toLocaleString()}</div>
+        <div id="resultDetails"></div>
+        <div style="height:10px"></div>
+        <div style="display:flex;gap:8px">
+          <button id="closeRes" class="primary">Close</button>
+        </div>`;
+      modal.appendChild(results);
+      const details = $('#resultDetails', results);
+      attempt.answers.forEach((a, i) => {
+        const q = quiz.questions.find(x => x.qid === a.qid);
+        const r = document.createElement('div');
+        r.className = 'card';
+r.style.marginTop = '8px';
+        r.innerHTML = `<div style="font-weight:700">${i+1}. ${escapeHtml(q.text)}</div>
+          <div class="small-muted">Your answer: ${escapeHtml(String(a.answer||''))} • Correct: ${escapeHtml(String(q.correctAnswer||''))} • Obtained: ${a.obtainedMarks}/${a.marks}</div>`;
+        details.appendChild(r);
+      });
+      $('#closeRes').addEventListener('click', ()=> { modal.style.display='none'; modal.innerHTML=''; refreshAll(); });
+    });
+  }
+  // ---------- Attempts list ----------
+  function renderAttempts(){
+    const container = $('#attemptsList');
+    container.innerHTML = '';
+    const attempts = (read(STORE_KEYS.ATTEMPTS) || []).filter(a => state.currentUser ? a.userId === state.currentUser.id : false).reverse();
+    if(attempts.length === 0){ container.innerHTML = '<div class="muted">No attempts yet.</div>'; return; }
+    attempts.forEach(a => {
+      const quiz = (read(STORE_KEYS.QUIZZES) || []).find(q=>q.id===a.quizId);
+      const el = document.createElement('div');
+      el.className = 'attempt-row';
+      el.innerHTML = `<div>
+        <div style="font-weight:700">${escapeHtml(quiz ? quiz.title : 'Unknown quiz')}</div>
+        <div class="small-muted">${new Date(a.when).toLocaleString()}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700">${a.totalObtained} / ${a.totalPossible}</div>
+        <div><button class="ghost" data-id="${a.id}">View</button></div>
+      </div>`;
+      container.appendChild(el);
+      el.querySelector('button').addEventListener('click', ()=>{
+        alert('Attempt details:\\n' + JSON.stringify(a, null, 2));
+      });
+    });
+  }
+  // ---------- Dashboard stats and chart ----------
+  let marksChart = null;
+  function renderDashboard(){
+    // stats
+    const attemptsAll = read(STORE_KEYS.ATTEMPTS) || [];
+    const userAttempts = attemptsAll.filter(a => state.currentUser ? a.userId === state.currentUser.id : false);
+    const attemptsCount = userAttempts.length;
+    const totalMarks = userAttempts.reduce((s,a)=>s + (a.totalObtained||0), 0);
+    const totalPossible = userAttempts.reduce((s,a)=>s + (a.totalPossible||0), 0);
+    const avgPercent = totalPossible === 0 ? 0 : Math.round((totalMarks/totalPossible)*100);
+    $('#stat-attempts').textContent = attemptsCount;
+    $('#stat-marks').textContent = totalMarks;
+    $('#stat-avg').textContent = avgPercent + '%';
+    // chart: last 10 attempts
+    const recent = userAttempts.slice(-10);
+    const labels = recent.map(r => new Date(r.when).toLocaleString());
+    const data = recent.map(r => Math.round((r.totalObtained / r.totalPossible) * 100));
+    const ctx = document.getElementById('marksChart').getContext('2d');
+    if(marksChart) marksChart.destroy();
+    marksChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Score %', data }]},
+      options: {
+        responsive:true,
+        maintainAspectRatio:false,
+        scales: { y: { min:0, max:100 } },
+        plugins: { legend:{ display:false } }
+      }
+    });
+  }
+  // ---------- Export and Reset ----------
+  $('#downloadJson').addEventListener('click', ()=>{
+    const data = {
+      users: read(STORE_KEYS.USERS) || [],
+      quizzes: read(STORE_KEYS.QUIZZES) || [],
+      attempts: read(STORE_KEYS.ATTEMPTS) || []
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'quizapp-data.json'; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+  $('#resetData').addEventListener('click', ()=>{
+    if(!confirm('Reset all demo data? This clears localStorage for this demo.')) return;
+    localStorage.removeItem(STORE_KEYS.USERS);
+    localStorage.removeItem(STORE_KEYS.QUIZZES);
+    localStorage.removeItem(STORE_KEYS.ATTEMPTS);
+    localStorage.removeItem(STORE_KEYS.CUR);
+    ensureStore();
+    maybeInitDemo();
+    state.currentUser = null;
+    renderAuthArea();
+    refreshAll();
+    alert('Demo data reset.');
+  });
+  $('#exportData').addEventListener('click', ()=> document.getElementById('downloadJson').click());
+  // quick create button
+  $('#quick-create').addEventListener('click', ()=> showView('create'));
+  // sample CSV import button not necessary (handled by file input)
+  // sign-up sample: prefill login modal? omitted
+  // ---------- Helpers ----------
+  function escapeHtml(s){ return String(s || '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+  // ---------- Refresh renderer ----------
+  function refreshAll(){
+    renderAuthArea();
+    renderQuizList();
+    renderAttempts();
+    renderDashboard();
+    // update top signedAs
+    signedAs.textContent = state.currentUser ? `Signed as: ${state.currentUser.name}` : 'Not signed in';
+  }
+  refreshAll();
+  function renderView(name){
+    // render view-specific things
+    if(name === 'dashboard') renderDashboard();
+    if(name === 'create') { renderQuestions(); }
+    if(name === 'quizzes') renderQuizList();
+    if(name === 'attempts') renderAttempts();
+  }
+  // ---------- Initial view ----------
+  showView('dashboard');
+  // ---------- Misc: click outside to dismiss etc (not needed) ----------
+})();
+</script>
+</body>
+</html>
